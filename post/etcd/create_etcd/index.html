@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="description" content="">
+<meta name="generator" content="Hugo 0.62.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="http://liushaoxiong10.github.io/css/style.css" type="text/css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Code+Pro:400,700" type="text/css">
+<link rel="alternate" href="http://liushaoxiong10.github.io/index.xml" type="application/rss+xml" title="K0ala">
+<title>创建高可用etcd集群 - K0ala</title>
+</head>
+<body>
+
+<header>
+  <div class="container clearfix">
+    <a class="path" href="http://liushaoxiong10.github.io/">[K0ala]</a>
+    <span class="caret"># _</span>
+    <div class="right">
+      
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+
+<main role="main" class="article">
+  
+<article class="single" itemscope itemtype="http://schema.org/BlogPosting">
+  <div class="meta">
+
+    <span class="key">published on</span>
+    <span class="val"><time itemprop="datePublished" datetime="2020-01-11">January 11, 2020</time></span>
+
+
+    <span class="key">in</span>
+    <span class="val">
+
+        <a href="http://liushaoxiong10.github.io/categories/etcd-%E4%BD%BF%E7%94%A8">etcd 使用</a>
+
+    </span>
+
+
+    <br>
+    <span class="key">tags:</span>
+    <span class="val">
+
+        <a href="http://liushaoxiong10.github.io/tags/etcd">etcd</a>
+
+    </span>
+
+  </div>
+  <h1 class="headline" itemprop="headline">创建高可用etcd集群</h1>
+  <section class="body" itemprop="articleBody">
+    <h1 id="etcd">搭建高可用etcd集群</h1>
+<h2 id="etcd-">etcd 简介</h2>
+<p>ETCD 是一个高可用的分布式键值数据库，可用于服务发现。底层集群 boltDB。</p>
+<p>内部采用 raft 协议作为一致性算法。由于Raft算法在做决策时需要多数节点的投票，所以etcd一般部署集群推荐奇数个节点，推荐的数量为3、5或者7个节点构成一个集群。</p>
+<p>特点：</p>
+<ul>
+<li>简单：安装配置简单，而且提供了 HTTP API 进行交互，使用也很简单</li>
+<li>安全：支持 SSL 证书验证</li>
+<li>快速：每个实例每秒支持1k次写操作</li>
+<li>可靠：采用 raft 算法，实现分布式系统数据的可用性和一致性</li>
+</ul>
+<p>占用端口：</p>
+<ul>
+<li>2379 端口提供 HTTP API 服务</li>
+<li>2380 端口和 peers（集群内其他节点）通信</li>
+</ul>
+<h2 id="etcd--1">etcd 名词解释</h2>
+<ul>
+<li>Raft： 保证分布式系统强一致性的算法。</li>
+<li>Node： 一个Raft状态机实例。</li>
+<li>Member： 一个etcd实例。它管理着一个Node，并且可以为客户端请求提供服务。</li>
+<li>Cluster：由多个Member构成可以协同工作的etcd集群。</li>
+<li>Peer：对同一个etcd集群中另外一个Member的称呼。</li>
+<li>Client： 向etcd集群发送HTTP请求的客户端。</li>
+<li>WAL：预写式日志，etcd用于持久化存储的日志格式。</li>
+<li>snapshot：etcd防止WAL文件过多而设置的快照，存储etcd数据状态。</li>
+<li>Proxy：etcd的一种模式，为etcd集群提供反向代理服务。</li>
+<li>Leader：Raft算法中通过竞选而产生的处理所有数据提交的节点。</li>
+<li>Follower：竞选失败的节点作为Raft中的从属节点，为算法提供强一致性保证。</li>
+<li>Candidate：当Follower超过一定时间接收不到Leader的心跳时转变为Candidate开始Leader竞- 选。</li>
+<li>Term：某个节点成为Leader到下一次竞选开始的时间周期，称为一个Term。</li>
+<li>Index：数据项编号。Raft中通过Term和Index来定位数据。</li>
+</ul>
+<h2 id="heading">工作原理</h2>
+<p>etcd 集群是由多个 member 组层，每个 member 是一个etcd 实例。</p>
+<p>在正常运行的状态下，集群中会有一个 leader，其余的 member 都是 follower。leader 向 follower 同步日志，保证数据在各个 member 都有副本。leader 还会定时向所有的 member 发送心跳报文，如果在规定的时间里 follower 没有收到心跳，就会重新进行选举。</p>
+<p>客户端所有的请求都会先发送给 leader，leader 向所有的 follower 同步日志，等收到超过半数的确认后就把该日志存储到磁盘，并返回响应客户端。</p>
+<p>每个 etcd 服务有三大主要部分组成：raft 实现、WAL 日志存储、数据的存储和索引。WAL 会在本地磁盘上存储日志内容（wal file）和快照（snapshot）。</p>
+<h2 id="heading-1">集群规划</h2>
+<table>
+<thead>
+<tr>
+<th align="center">节点名称</th>
+<th align="center">ip</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">etcd1</td>
+<td align="center">192.168.31.101</td>
+</tr>
+<tr>
+<td align="center">etcd3</td>
+<td align="center">192.168.31.102</td>
+</tr>
+<tr>
+<td align="center">etcd3</td>
+<td align="center">192.168.31.103</td>
+</tr>
+<tr>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+</tbody>
+</table>
+<h2 id="heading-2">集群搭建</h2>
+<h3 id="heading-3">使用证书</h3>
+<h4 id="cfssl">安装cfssl</h4>
+<pre><code>wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+
+chmod +x cfssl_linux-amd64 cfssljson_linux-amd64
+
+mv cfssl_linux-amd64 /usr/local/bin/cfssl
+mv cfssljson_linux-amd64 /usr/local/bin/cfssljson
+
+export PATH=/usr/local/bin:$PATH
+</code></pre><h4 id="ca">创建ca证书，客户端，服务端，节点之间的证书</h4>
+<pre><code>mkdir -p /etc/etcd/pki
+cd /etc/etcd/pki
+cfssl print-defaults config &gt; ca-config.json
+cfssl print-defaults csr &gt; ca-csr.json
+</code></pre><p>修改ca-config.json</p>
+<p>server auth表示client可以用该ca对server提供的证书进行验证</p>
+<p>client auth表示server可以用该ca对client提供的证书进行验证</p>
+<pre><code>{
+    &quot;signing&quot;: {
+        &quot;default&quot;: {
+            &quot;expiry&quot;: &quot;43800h&quot;
+        },
+        &quot;profiles&quot;: {
+            &quot;server&quot;: {
+                &quot;expiry&quot;: &quot;43800h&quot;,
+                &quot;usages&quot;: [
+                    &quot;signing&quot;,
+                    &quot;key encipherment&quot;,
+                    &quot;server auth&quot;,
+                    &quot;client auth&quot;
+                ]
+            },
+            &quot;client&quot;: {
+                &quot;expiry&quot;: &quot;43800h&quot;,
+                &quot;usages&quot;: [
+                    &quot;signing&quot;,
+                    &quot;key encipherment&quot;,
+                    &quot;client auth&quot;
+                ]
+            },
+            &quot;peer&quot;: {
+                &quot;expiry&quot;: &quot;43800h&quot;,
+                &quot;usages&quot;: [
+                    &quot;signing&quot;,
+                    &quot;key encipherment&quot;,
+                    &quot;server auth&quot;,
+                    &quot;client auth&quot;
+                ]
+            }
+        }
+    }
+}
+</code></pre><p>创建证书签名请求ca-csr.json</p>
+<pre><code>{
+    &quot;CN&quot;: &quot;etcd&quot;,
+    &quot;key&quot;: {
+        &quot;algo&quot;: &quot;rsa&quot;,
+        &quot;size&quot;: 2048
+    },
+     &quot;ca&quot;: {
+       &quot;expiry&quot;: &quot;87600h&quot;
+    }
+}
+</code></pre><p>生成 CA 证书和私钥</p>
+<pre><code>cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+</code></pre><p>创建客户端证书
+client.json</p>
+<pre><code>{
+    &quot;CN&quot;: &quot;client&quot;,
+    &quot;key&quot;: {
+        &quot;algo&quot;: &quot;ecdsa&quot;,
+        &quot;size&quot;: 256
+    }
+    &quot;ca&quot;: {
+       &quot;expiry&quot;: &quot;87600h&quot;
+    }
+}
+</code></pre><p>生成证书</p>
+<pre><code>cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client client.json  | cfssljson -bare client -
+----------------------------------------------------------------
+# ls ca*
+ca-config.json ca.csr ca-csr.json ca-key.pem ca.pem client-key.pem client.pem
+</code></pre><p>创建server，peer 证书
+etcd.json</p>
+<pre><code>{
+    &quot;CN&quot;: &quot;etcd&quot;,
+    &quot;hosts&quot;: [
+        &quot;127.0.0.1&quot;,
+        &quot;192.168.255.131&quot;,
+        &quot;192.168.255.132&quot;,
+        &quot;192.168.255.133&quot;
+    ],
+    &quot;key&quot;: {
+        &quot;algo&quot;: &quot;ecdsa&quot;,
+        &quot;size&quot;: 256
+    },
+    &quot;names&quot;: [
+        {
+            &quot;C&quot;: &quot;CN&quot;,
+            &quot;L&quot;: &quot;SH&quot;,
+            &quot;ST&quot;: &quot;SH&quot;
+        }
+    ]
+}
+</code></pre><p>生成证书</p>
+<pre><code>cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server etcd.json | cfssljson -bare server
+
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer etcd.json | cfssljson -bare peer
+</code></pre><p>需要将生成的证书分发到节点2，节点3</p>
+<h3 id="etcd-1">安装etcd</h3>
+<h4 id="heading-4">二进制安装</h4>
+<p>到 <a href="https://github.com/coreos/etcd/releases">https://github.com/coreos/etcd/releases</a> 页面下载最新版本的二进制文件</p>
+<pre><code>wget https://github.com/coreos/etcd/releases/download/v3.1.5/etcd-v3.1.5-linux-amd64.tar.gz
+tar -xvf etcd-v3.1.5-linux-amd64.tar.gz
+mv etcd-v3.1.5-linux-amd64/etcd* /usr/local/bin
+</code></pre><h4 id="yum-">yum 安装</h4>
+<pre><code># centos
+yum install -y etcd
+</code></pre><h3 id="-etcd--systemd-unit-">创建 etcd 的 systemd unit 文件</h3>
+<p>在/usr/lib/systemd/system/目录下创建文件etcd.service，内容如下。注意替换IP地址为你自己的etcd集群的主机IP。</p>
+<pre><code>[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/coreos
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/
+EnvironmentFile=-/etc/etcd/etcd.conf
+ExecStart=/usr/local/bin/etcd \
+  --name ${ETCD_NAME} \
+  --cert-file=/etc/etcd/pki/server.pem  \
+  --key-file=/etc/etcd/pki/server-key.pem \
+  --peer-cert-file=/etc/etcd/pki/peer.pem \
+  --peer-key-file=/etc/etcd/pki/peer-key.pem \
+  --trusted-ca-file=/etc/etcd/pki/ca.pem \
+  --peer-trusted-ca-file=/etc/etcd/pki/ca.pem  \
+  --initial-advertise-peer-urls ${ETCD_INITIAL_ADVERTISE_PEER_URLS} \
+  --listen-peer-urls ${ETCD_LISTEN_PEER_URLS} \
+  --listen-client-urls ${ETCD_LISTEN_CLIENT_URLS},http://127.0.0.1:2379 \
+  --advertise-client-urls ${ETCD_ADVERTISE_CLIENT_URLS} \
+  --initial-cluster-token ${ETCD_INITIAL_CLUSTER_TOKEN} \
+  --initial-cluster etcd1=https://192.168.31.101:2380,etcd2=https://192.168.31.102:2380,etcd3=https://192.168.31.103:2380 \
+  --initial-cluster-state new \
+  --data-dir=${ETCD_DATA_DIR}
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+</code></pre><p>还需要创建/etc/etcd/etcd.conf 用户提供环境变量, （需要先mkdir /var/lib/etcd)</p>
+<pre><code># [member]
+# 节点名称
+ETCD_NAME=etcd1
+# 数据存放位置
+ETCD_DATA_DIR=&quot;/var/lib/etcd&quot;
+# 集群内部通讯地址
+ETCD_LISTEN_PEER_URLS=&quot;https://192.168.31.101:2380&quot;
+# 服务地址
+ETCD_LISTEN_CLIENT_URLS=&quot;https://192.168.31.101:2379&quot;
+
+#[cluster]
+ETCD_INITIAL_ADVERTISE_PEER_URLS=&quot;https://192.168.31.101:2380&quot;
+# 初始化集群 token
+ETCD_INITIAL_CLUSTER_TOKEN=&quot;etcd-cluster&quot;
+ETCD_ADVERTISE_CLIENT_URLS=&quot;https://192.168.31.101:2379&quot;
+</code></pre><p>节点2，节点3 需要做同样操作</p>
+<h3 id="etcd-2">启动etcd</h3>
+<pre><code>systemctl daemon-reload &amp;&amp; systemctl enable etcd &amp;&amp; systemctl start etcd &amp;&amp; systemctl status etcd
+</code></pre><h3 id="heading-5">验证集群</h3>
+<pre><code>etcdctl --ca-file=/etc/etcd/pki/ca.pem --cert-file=/etc/etcd/pki/server.pem --key-file=/etc/etcd/pki/server-key.pem --endpoints=https://192.168.31.101:2379,https://192.168.31.102:2379,https://192.168.31.103:2379 cluster-health
+
+2020-01-12 00:58:35.382686 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
+2020-01-12 00:58:35.386013 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
+member 969af216adf1108 is healthy: got healthy result from https://192.168.31.102:2379
+member 4d384076f6bc6dde is healthy: got healthy result from https://192.168.31.101:2379
+member ea776d7c1c3c494c is healthy: got healthy result from https://192.168.31.103:2379
+cluster is healthy
+</code></pre><h3 id="heading-6">查看节点成员</h3>
+<pre><code>etcdctl --ca-file=/etc/etcd/pki/ca.pem --cert-file=/etc/etcd/pki/server.pem --key-file=/etc/etcd/pki/server-key.pem --endpoints=https://192.168.31.101:2379,https://192.168.31.102:2379,https://192.168.31.103:2379  member list
+
+2020-01-12 01:10:11.501023 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
+969af216adf1108: name=infra2 peerURLs=https://192.168.31.102:2380 clientURLs=https://192.168.31.102:2379 isLeader=true
+4d384076f6bc6dde: name=infra1 peerURLs=https://192.168.31.101:2380 clientURLs=https://192.168.31.101:2379 isLeader=false
+ea776d7c1c3c494c: name=infra3 peerURLs=https://192.168.31.103:2380 clientURLs=https://192.168.31.103:2379 isLeader=false
+</code></pre><p>至此集群就搭建完成。</p>
+
+  </section>
+</article>
+
+</main>
+
+</div>
+
+<footer>
+  <div class="container">
+    <span class="copyright">&copy; 2020 K0ala - <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
+

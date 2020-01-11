@@ -3,15 +3,53 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>https://liushaoxiong10.github.io/categories/</loc>
+    <loc>http://liushaoxiong10.github.io/post/etcd/etcdctl/</loc>
+    <lastmod>2020-01-12T01:20:17+08:00</lastmod>
   </url>
   
   <url>
-    <loc>https://liushaoxiong10.github.io/</loc>
+    <loc>http://liushaoxiong10.github.io/</loc>
+    <lastmod>2020-01-12T01:20:17+08:00</lastmod>
   </url>
   
   <url>
-    <loc>https://liushaoxiong10.github.io/tags/</loc>
+    <loc>http://liushaoxiong10.github.io/post/</loc>
+    <lastmod>2020-01-12T01:20:17+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/categories/</loc>
+    <lastmod>2020-01-12T01:14:58+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/tags/etcd/</loc>
+    <lastmod>2020-01-12T01:14:58+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/categories/etcd-%E4%BD%BF%E7%94%A8/</loc>
+    <lastmod>2020-01-12T01:14:58+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/post/etcd/where_use_etcd/</loc>
+    <lastmod>2020-01-12T01:14:58+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/tags/</loc>
+    <lastmod>2020-01-12T01:14:58+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/post/etcd/create_etcd/</loc>
+    <lastmod>2020-01-11T23:46:17+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://liushaoxiong10.github.io/about/</loc>
+    <lastmod>2020-01-10T00:35:41+08:00</lastmod>
   </url>
   
 </urlset>

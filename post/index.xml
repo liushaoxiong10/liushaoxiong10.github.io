@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>K0ala</title>
-    <link>http://liushaoxiong10.github.io/</link>
-    <description>Recent content on K0ala</description>
+    <title>Posts on K0ala</title>
+    <link>http://liushaoxiong10.github.io/post/</link>
+    <description>Recent content in Posts on K0ala</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
     <lastBuildDate>Sun, 12 Jan 2020 01:20:17 +0800</lastBuildDate>
     
-	<atom:link href="http://liushaoxiong10.github.io/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="http://liushaoxiong10.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
@@ -41,15 +41,6 @@
  简单：安装配置简单，而且提供了 HTTP API 进行交互，使用也很简单 安全：支持 SSL 证书验证 快速：每个实例每秒支持1k次写操作 可靠：采用 raft 算法，实现分布式系统数据的可用性和一致性  占用端口：
  2379 端口提供 HTTP API 服务 2380 端口和 peers（集群内其他节点）通信  etcd 名词解释  Raft： 保证分布式系统强一致性的算法。 Node： 一个Raft状态机实例。 Member： 一个etcd实例。它管理着一个Node，并且可以为客户端请求提供服务。 Cluster：由多个Member构成可以协同工作的etcd集群。 Peer：对同一个etcd集群中另外一个Member的称呼。 Client： 向etcd集群发送HTTP请求的客户端。 WAL：预写式日志，etcd用于持久化存储的日志格式。 snapshot：etcd防止WAL文件过多而设置的快照，存储etcd数据状态。 Proxy：etcd的一种模式，为etcd集群提供反向代理服务。 Leader：Raft算法中通过竞选而产生的处理所有数据提交的节点。 Follower：竞选失败的节点作为Raft中的从属节点，为算法提供强一致性保证。 Candidate：当Follower超过一定时间接收不到Leader的心跳时转变为Candidate开始Leader竞- 选。 Term：某个节点成为Leader到下一次竞选开始的时间周期，称为一个Term。 Index：数据项编号。Raft中通过Term和Index来定位数据。  工作原理 etcd 集群是由多个 member 组层，每个 member 是一个etcd 实例。
 在正常运行的状态下，集群中会有一个 leader，其余的 member 都是 follower。leader 向 follower 同步日志，保证数据在各个 member 都有副本。leader 还会定时向所有的 member 发送心跳报文，如果在规定的时间里 follower 没有收到心跳，就会重新进行选举。</description>
-    </item>
-    
-    <item>
-      <title>About</title>
-      <link>http://liushaoxiong10.github.io/about/</link>
-      <pubDate>Fri, 10 Jan 2020 00:35:41 +0800</pubDate>
-      
-      <guid>http://liushaoxiong10.github.io/about/</guid>
-      <description>关于我  2010 HR@RUC 2014 CS@ICT, CAS  </description>
     </item>
     
   </channel>
