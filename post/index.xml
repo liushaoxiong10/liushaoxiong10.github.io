@@ -6,10 +6,20 @@
     <description>Recent content in Posts on K0ala 云原生</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Sun, 12 Jan 2020 01:14:58 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 18 Jan 2020 13:06:30 +0800</lastBuildDate>
     
 	<atom:link href="https://liushaoxiong10.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>kubernetes 基本概念</title>
+      <link>https://liushaoxiong10.github.io/post/kubernetes/term/</link>
+      <pubDate>Sat, 18 Jan 2020 13:06:30 +0800</pubDate>
+      
+      <guid>https://liushaoxiong10.github.io/post/kubernetes/term/</guid>
+      <description>&lt;h1 id=&#34;kubernetes&#34;&gt;Kubernetes是什么？&lt;/h1&gt;
+&lt;p&gt;Kubernetes是一个完备的分布式系统支撑平台。Kubernetes具有完备的集群管理能力，包括多层次的安全防护和准入机制、多租户应用支撑能力、透明的服务注册和服务发现机制、内建的智能负载均衡器、强大的故障发现和自我修复能力、服务滚动升级和在线扩容能力、可扩展的资源自动调度机制，以及多粒度的资源配额管理能力。&lt;/p&gt;</description>
+    </item>
     
     <item>
       <title>etcd 使用场景</title>
